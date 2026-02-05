@@ -1,9 +1,27 @@
 <?php
+/**
+ * WordPress Hook Extractor
+ *
+ * @package WpHookExtractor
+ */
 
+/**
+ * Extracts WordPress hooks from PHP files and generates documentation.
+ */
 class WpHookExtractor {
 
+	/**
+	 * Configuration options.
+	 *
+	 * @var array
+	 */
 	private $config;
 
+	/**
+	 * Constructor.
+	 *
+	 * @param array $config Configuration options.
+	 */
 	public function __construct( $config = array() ) {
 		$this->config = array_merge(
 			array(
@@ -14,15 +32,22 @@ class WpHookExtractor {
 				'namespace'          => '',
 				'example_style'      => 'default',
 				'autoexample_phpdoc' => true,
-				'top_headline'       => false,
+				'github_wiki'        => true,
 			),
 			$config
 		);
 	}
 
+	/**
+	 * Extracts hooks from a PHP file.
+	 *
+	 * @param string $file_path    Path to the PHP file.
+	 * @param string $relative_dir Relative directory path.
+	 * @return array Extracted hooks.
+	 */
 	public function extract_hooks_from_file( $file_path, $relative_dir = '' ) {
-		$tokens = \token_get_all( file_get_contents( $file_path ) );
-		$hooks = array();
+		$tokens   = \token_get_all( file_get_contents( $file_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$hooks    = array();
 		$main_dir = $relative_dir ? strtok( $relative_dir, '/' ) : basename( $file_path );
 
 		foreach ( $tokens as $i => $token ) {
@@ -30,13 +55,13 @@ class WpHookExtractor {
 				continue;
 			}
 			$hook_function = ltrim( $token[1], '\\' );
-			if ( ! in_array( $hook_function, array( 'apply_filters', 'do_action', 'apply_filters_deprecated', 'do_action_deprecated' ) ) ) {
+			if ( ! in_array( $hook_function, array( 'apply_filters', 'do_action', 'apply_filters_deprecated', 'do_action_deprecated' ), true ) ) {
 				continue;
 			}
 
-			$comment = '';
-			$hook = false;
-			$l = max( 0, $i - 50 );
+			$comment                 = '';
+			$hook                    = false;
+			$l                       = max( 0, $i - 50 );
 			$found_significant_token = false;
 			for ( $j = $i; $j > $l; $j-- ) {
 				if ( ! is_array( $tokens[ $j ] ) ) {
@@ -59,7 +84,7 @@ class WpHookExtractor {
 			}
 
 			$deprecation_info = array();
-			$is_deprecated = in_array( $hook_function, array( 'apply_filters_deprecated', 'do_action_deprecated' ) );
+			$is_deprecated    = in_array( $hook_function, array( 'apply_filters_deprecated', 'do_action_deprecated' ), true );
 
 			for ( $j = $i + 1; $j < $i + 20; $j++ ) {
 				if ( ! isset( $tokens[ $j ] ) ) {
@@ -90,7 +115,7 @@ class WpHookExtractor {
 
 			if (
 				$hook
-				&& ! in_array( $hook, $this->config['ignore_filter'] )
+				&& ! in_array( $hook, $this->config['ignore_filter'], true )
 				&& ( ! $this->config['ignore_regex'] || ! preg_match( $this->config['ignore_regex'], $hook ) )
 			) {
 				if ( ! isset( $hooks[ $hook ] ) ) {
@@ -116,10 +141,10 @@ class WpHookExtractor {
 					$hooks[ $hook ] = $hook_data;
 				}
 
-				$ret = $this->extract_vars( $hooks[ $hook ]['params'], $tokens, $i );
-				$file_key = $relative_dir ? $relative_dir . '/' . basename( $file_path ) . ':' . $token[2] : basename( $file_path ) . ':' . $token[2];
+				$ret                                  = $this->extract_vars( $hooks[ $hook ]['params'], $tokens, $i );
+				$file_key                             = $relative_dir ? $relative_dir . '/' . basename( $file_path ) . ':' . $token[2] : basename( $file_path ) . ':' . $token[2];
 				$hooks[ $hook ]['files'][ $file_key ] = $ret[1];
-				$hooks[ $hook ]['params'] = $ret[0];
+				$hooks[ $hook ]['params']             = $ret[0];
 
 				// Merge deprecation info if this is a new deprecated hook and we already have the hook.
 				if ( $is_deprecated && ! isset( $hooks[ $hook ]['deprecated'] ) ) {
@@ -139,13 +164,21 @@ class WpHookExtractor {
 		return $hooks;
 	}
 
+	/**
+	 * Extracts variable names from hook parameters.
+	 *
+	 * @param array $params Existing parameters.
+	 * @param array $tokens All tokens from the file.
+	 * @param int   $i      Current token index.
+	 * @return array Parameters and signature.
+	 */
 	public function extract_vars( $params, $tokens, $i ) {
-		$parens = array();
-		$var = 0;
-		$vars = array( '' );
-		$signature = $tokens[ $i ][1];
-		$line = $tokens[ $i ][2];
-		$search_window = 50;
+		$parens        = array();
+		$var           = 0;
+		$vars          = array( '' );
+		$signature     = $tokens[ $i ][1];
+		$line          = $tokens[ $i ][2];
+		$search_window = 100;
 		for ( $j = $i + 1; $j < $i + $search_window; $j++ ) {
 			if ( ! isset( $tokens[ $j ] ) ) {
 				break;
@@ -159,7 +192,7 @@ class WpHookExtractor {
 					case '(':
 					case '{':
 						$vars[ $var ] .= $token;
-						$parens[] = $token;
+						$parens[]      = $token;
 
 						break;
 					case ')':
@@ -210,7 +243,7 @@ class WpHookExtractor {
 		array_shift( $vars );
 		foreach ( $vars as $k => $var ) {
 			if ( isset( $params[ $k ] ) ) {
-				if ( ! in_array( $var, $params[ $k ] ) ) {
+				if ( ! in_array( $var, $params[ $k ], true ) ) {
 					$params[ $k ][] = $var;
 				}
 			} else {
@@ -220,13 +253,20 @@ class WpHookExtractor {
 		return array( $params, $signature );
 	}
 
+	/**
+	 * Parses a docblock comment and extracts tags.
+	 *
+	 * @param string $raw_comment The raw docblock comment.
+	 * @param array  $params      Existing parameters.
+	 * @return array Parsed tags from the docblock.
+	 */
 	private function parse_docblock( $raw_comment, $params ) {
 		if ( preg_match( '#^([ \t]*\*\s*|//\s*)?Documented (in|at) #m', $raw_comment ) ) {
 			return array();
 		}
 		// Adapted from https://github.com/kamermans/docblock-reflection.
-		$tags = array();
-		$lines = array_filter( explode( PHP_EOL, trim( $raw_comment ) ) );
+		$tags    = array();
+		$lines   = array_filter( explode( PHP_EOL, trim( $raw_comment ) ) );
 		$matches = null;
 		$comment = '';
 
@@ -251,10 +291,11 @@ class WpHookExtractor {
 				array_pop( $lines );
 				break;
 		}
-		$inside_code = false;
-		$current_example = null;
-		$example_content = '';
-		$code_block_indent = null;
+		$inside_code        = false;
+		$inside_param_block = false;
+		$current_example    = null;
+		$example_content    = '';
+		$code_block_indent  = null;
 
 		foreach ( $lines as $line ) {
 			// Check for code block markers.
@@ -321,8 +362,8 @@ class WpHookExtractor {
 					'title'   => $current_example,
 					'content' => trim( $example_content ),
 				);
-				$current_example = null;
-				$example_content = '';
+				$current_example    = null;
+				$example_content    = '';
 				// Continue processing this line as a regular tag.
 			}
 
@@ -332,8 +373,26 @@ class WpHookExtractor {
 				continue;
 			}
 
+			// Handle lines inside @param array blocks (WordPress array parameter syntax).
+			if ( $inside_param_block ) {
+				// Check for closing brace.
+				if ( preg_match( '#^\s*\}\s*$#', $line ) ) {
+					$inside_param_block = false;
+					continue;
+				}
+				// Parse @type tags inside the block, skip other content.
+				if ( ! preg_match( '#^@#', $line ) ) {
+					continue;
+				}
+			}
+
 			if ( preg_match( '#@(param)(.*)#', $line, $matches ) ) {
 				$tag_value = \trim( $matches[2] );
+
+				// Check if this starts an array parameter block (ends with {).
+				if ( preg_match( '#\{\s*$#', $tag_value ) ) {
+					$inside_param_block = true;
+				}
 
 				// If this tag was already parsed, make its value an array.
 				if ( isset( $tags['params'] ) ) {
@@ -344,13 +403,17 @@ class WpHookExtractor {
 				continue;
 			}
 			if ( preg_match( '#@([^ ]+)(.*)#', $line, $matches ) ) {
-				$tag_name = $matches[1] . 's';
+				$tag_name  = $matches[1] . 's';
 				$tag_value = \trim( $matches[2] );
 				if ( ! $tag_value ) {
 					continue;
 				}
 				// If this tag was already parsed, make its value an array.
 				if ( isset( $tags[ $tag_name ] ) ) {
+					// Convert to array format if not already (first occurrence was stored as string).
+					if ( ! is_array( $tags[ $tag_name ] ) ) {
+						$tags[ $tag_name ] = array( array( $tags[ $tag_name ] ) );
+					}
 					$tags[ $tag_name ][] = array( $tag_value );
 				} else {
 					$tags[ $tag_name ] = $tag_value;
@@ -377,7 +440,7 @@ class WpHookExtractor {
 		foreach ( $params as $k => $param ) {
 			if ( ! isset( $tags['params'][ $k ] ) ) {
 				$tags['params'][ $k ] = $param;
-			} elseif ( ! in_array( $tags['params'][ $k ], $param ) ) {
+			} elseif ( ! in_array( $tags['params'][ $k ], $param, true ) ) {
 				$tags['params'][ $k ] = array_merge( $tags['params'][ $k ], $param );
 			}
 		}
@@ -397,6 +460,13 @@ class WpHookExtractor {
 		return $ret;
 	}
 
+	/**
+	 * Merges hooks from a file into the main hooks array.
+	 *
+	 * @param array $hooks      Existing hooks.
+	 * @param array $file_hooks Hooks from the current file.
+	 * @return array Merged hooks.
+	 */
 	public function merge_file_hooks( $hooks, $file_hooks ) {
 		// Merge results with existing hooks.
 		foreach ( $file_hooks as $hook => $data ) {
@@ -428,18 +498,24 @@ class WpHookExtractor {
 		return $hooks;
 	}
 
+	/**
+	 * Scans a directory recursively for PHP files and extracts hooks.
+	 *
+	 * @param string $base_path Base directory path to scan.
+	 * @return array All extracted hooks.
+	 */
 	public function scan_directory( $base_path ) {
 		$files = new RecursiveIteratorIterator(
 			new RecursiveDirectoryIterator( $base_path ),
 			RecursiveIteratorIterator::LEAVES_ONLY
 		);
-		$b = strlen( $base_path ) + 1;
+		$b     = strlen( $base_path ) + 1;
 		$hooks = array();
 		foreach ( $files as $file ) {
 			if ( $file->getExtension() !== 'php' ) {
 				continue;
 			}
-			$dir = substr( $file->getPath(), $b );
+			$dir      = substr( $file->getPath(), $b );
 			$main_dir = strtok( $dir, '/' );
 			if ( '.' === substr( $main_dir, 0, 1 ) || '.' === substr( $file->getFilename(), 0, 1 ) ) {
 				continue;
@@ -449,7 +525,7 @@ class WpHookExtractor {
 			}
 
 			$file_hooks = $this->extract_hooks_from_file( $file->getPathname(), $dir );
-			$hooks = $this->merge_file_hooks( $hooks, $file_hooks );
+			$hooks      = $this->merge_file_hooks( $hooks, $file_hooks );
 		}
 
 		uksort(
@@ -465,24 +541,38 @@ class WpHookExtractor {
 		return $hooks;
 	}
 
+	/**
+	 * Generates documentation files from extracted hooks.
+	 *
+	 * @param array  $hooks           Extracted hooks.
+	 * @param string $docs_path       Path to write documentation.
+	 * @param string $github_blob_url Base URL for GitHub blob links.
+	 */
 	public function generate_documentation( $hooks, $docs_path, $github_blob_url ) {
 		$documentation = $this->create_documentation_content( $hooks, $github_blob_url );
 		$this->write_documentation( $documentation, $docs_path );
 	}
 
+	/**
+	 * Creates documentation content from extracted hooks.
+	 *
+	 * @param array  $hooks           Extracted hooks.
+	 * @param string $github_blob_url Base URL for GitHub blob links.
+	 * @return array Documentation content with index and hook pages.
+	 */
 	public function create_documentation_content( $hooks, $github_blob_url ) {
-		$index = '';
-		$section = '';
+		$index     = '';
+		$section   = '';
 		$hook_docs = array();
 
 		foreach ( $hooks as $hook => $data ) {
 			if ( $section !== $data['section'] ) {
 				$section = $data['section'];
-				$index .= PHP_EOL . '## ' . $section . PHP_EOL . PHP_EOL;
+				$index  .= PHP_EOL . '## ' . $section . PHP_EOL . PHP_EOL;
 			}
 			$sections = array();
 
-			if ( $this->config['top_headline'] ) {
+			if ( ! $this->config['github_wiki'] ) {
 				$sections['headline'] = "# $hook\n\n";
 			}
 
@@ -500,13 +590,14 @@ class WpHookExtractor {
 						$deprecation_warning .= '> ' . $data['replacement'] . "\n";
 					}
 				}
-				$deprecation_warning .= "\n";
+				$deprecation_warning    .= "\n";
 				$sections['deprecation'] = $deprecation_warning;
 			}
 
 			$has_example = false;
+			$link_ext    = $this->config['github_wiki'] ? '' : '.md';
 			if ( ! empty( $data['deprecated'] ) ) {
-				$index .= "- [~~`$hook`~~]($hook) **DEPRECATED**";
+				$index .= "- [~~`$hook`~~]($hook$link_ext) **DEPRECATED**";
 				if ( ! empty( $data['replacement'] ) ) {
 					// Check if replacement looks like a hook name or a message.
 					if ( strpos( $data['replacement'], ' ' ) === false && ! strpos( $data['replacement'], '.' ) ) {
@@ -516,7 +607,7 @@ class WpHookExtractor {
 					}
 				}
 			} else {
-				$index .= "- [`$hook`]($hook)";
+				$index .= "- [`$hook`]($hook$link_ext)";
 				if ( ! empty( $data['comment'] ) ) {
 					$index .= ' ' . strtok( $data['comment'], PHP_EOL );
 				}
@@ -528,7 +619,7 @@ class WpHookExtractor {
 
 			// Handle examples (both @example tags and Example: patterns).
 			if ( ! empty( $data['examples'] ) ) {
-				$has_example = true;
+				$has_example     = true;
 				$example_content = '';
 				foreach ( $data['examples'] as $example ) {
 					$example_content .= '## Example' . PHP_EOL . PHP_EOL;
@@ -544,15 +635,15 @@ class WpHookExtractor {
 
 			// Determine hook type regardless of parameters.
 			if ( 'do_action' === $data['type'] ) {
-				$hook_type = 'action';
+				$hook_type     = 'action';
 				$hook_function = 'add_action';
 			} else {
-				$hook_type = 'filter';
+				$hook_type     = 'filter';
 				$hook_function = 'add_filter';
 			}
 
-			$count = 0;
-			$signature_params = array();
+			$count                  = 0;
+			$signature_params       = array();
 			$consistent_param_count = 0;
 
 			if ( ! empty( $data['params'] ) ) {
@@ -564,8 +655,8 @@ class WpHookExtractor {
 					foreach ( $data['files'] as $file_signature ) {
 						$parts = explode( "'" . $hook . "'", $file_signature );
 						if ( count( $parts ) > 1 ) {
-							$param_part = $parts[1];
-							$comma_count = substr_count( $param_part, ',' );
+							$param_part       = $parts[1];
+							$comma_count      = substr_count( $param_part, ',' );
 							$file_param_count = $comma_count;
 							if ( $i < $file_param_count ) {
 								++$usage_count;
@@ -586,8 +677,8 @@ class WpHookExtractor {
 						}
 
 						if ( false !== strpos( $var, ' ' ) && false === strpos( $var, '\'' ) ) {
-							$param = $var;
-							$p = preg_split( '/ +/', $param, 3 );
+							$param      = $var;
+							$p          = preg_split( '/ +/', $param, 3 );
 							$vars[ $k ] = $p[1];
 							continue;
 						}
@@ -627,29 +718,29 @@ class WpHookExtractor {
 						} elseif ( preg_match( '#\$(?:[a-zA-Z0-9_]+)->(.+)$#', $var, $matches ) ) {
 							$vars[ $k ] = '$' . $matches[1];
 						} elseif ( preg_match( '#_[_exn]\(\s*([\'"][^\'"]+[\'"])#', $var, $matches ) ) {
-							$type = 'string';
+							$type       = 'string';
 							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $matches[1], '"\'' ) ) );
 						} elseif ( strlen( $var ) - strlen( trim( $var, '"\'' ) ) === 2 ) {
-							$type = 'string';
+							$type       = 'string';
 							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $var, '"\'' ) ) );
 						} elseif ( is_numeric( $var ) ) {
-							$type = 'int';
+							$type       = 'int';
 							$vars[ $k ] = '$int';
 						} elseif ( 'true' === $var || 'false' === $var ) {
-							$type = 'bool';
+							$type       = 'bool';
 							$vars[ $k ] = '$' . $var;
 						} elseif ( 'null' === $var ) {
 							$vars[ $k ] = '$ret';
 						} elseif ( in_array( $var, array( '$url' ), true ) ) {
 							$type = 'string';
 						} elseif ( '$array' === $var ) {
-							$type = 'array';
+							$type       = 'array';
 							$vars[ $k ] = '$array';
 						}
 					}
 
 					if ( ! $param ) {
-						$var = reset( $vars );
+						$var   = reset( $vars );
 						$param = $type . ' ' . $var;
 						$other = array_unique( array_diff( $vars, array( $param, $var, 'null' ) ) );
 						if ( $other ) {
@@ -658,10 +749,15 @@ class WpHookExtractor {
 					}
 
 					++$count;
-					$p = preg_split( '/ +/', $param, 3 );
+					$p    = preg_split( '/ +/', $param, 3 );
 					$p[0] = $this->maybe_prefix_namespace( $p[0] );
 					// Determine if this parameter should be optional (not used consistently across all files).
 					$is_optional = $i >= $consistent_param_count;
+
+					// Strip trailing { from array parameter descriptions (WordPress documentation style).
+					if ( isset( $p[2] ) ) {
+						$p[2] = rtrim( $p[2], ' {' );
+					}
 
 					if ( 'unknown' === $p[0] ) {
 						$params .= "\n- `{$p[1]}`";
@@ -670,12 +766,12 @@ class WpHookExtractor {
 						} else {
 							$signature_params[] = $p[1];
 						}
-						if ( isset( $p[2] ) ) {
+						if ( ! empty( $p[2] ) ) {
 							$params .= ' ' . $p[2];
 						}
 					} else {
 						$params .= "\n- *`{$p[0]}`* `{$p[1]}`";
-						if ( isset( $p[2] ) ) {
+						if ( ! empty( $p[2] ) ) {
 							$params .= ' ' . $p[2];
 						}
 						if ( substr( $p[0], -5 ) === '|null' || $is_optional ) {
@@ -690,11 +786,29 @@ class WpHookExtractor {
 					}
 				}
 
+				// Render @type tags for array parameters (WordPress documentation style).
+				if ( ! empty( $data['types'] ) ) {
+					$types_list = is_array( $data['types'] ) ? $data['types'] : array( array( $data['types'] ) );
+					foreach ( $types_list as $type_entry ) {
+						$type_value = is_array( $type_entry ) ? $type_entry[0] : $type_entry;
+						// Match: type (including generics like array<string, string>) $var_name description.
+						if ( preg_match( '/^(.+?)\s+(\$\w+)\s*(.*)$/', $type_value, $matches ) ) {
+							$type_str    = $this->maybe_prefix_namespace( $matches[1] );
+							$var_name    = $matches[2];
+							$description = $matches[3];
+							$params     .= "\n  - *`{$type_str}`* `{$var_name}`";
+							if ( ! empty( $description ) ) {
+								$params .= ' ' . $description;
+							}
+						}
+					}
+				}
+
 				// Generate signature based on format.
 				$hook_for_example = $this->get_hook_name_for_example( $hook );
 				switch ( $this->config['example_style'] ) {
 					case 'prefixed':
-						$callback_name = 'my_' . $hook . '_callback';
+						$callback_name      = 'my_' . $hook . '_callback';
 						$function_signature = "function {$callback_name}(";
 						if ( count( $signature_params ) === 0 ) {
 							$function_signature .= ') {';
@@ -705,7 +819,7 @@ class WpHookExtractor {
 						}
 						$function_signature .= "\n    // Your code here.";
 						if ( 'action' !== $hook_type && ! empty( $signature_params[0] ) ) {
-							$first_param = explode( ' ', $signature_params[0] );
+							$first_param         = explode( ' ', $signature_params[0] );
 							$function_signature .= "\n    return " . end( $first_param ) . ';';
 						}
 						$function_signature .= "\n}";
@@ -732,7 +846,7 @@ class WpHookExtractor {
 						$signature .= PHP_EOL . '        // Your code here.';
 						if ( 'action' !== $hook_type && ! empty( $signature_params[0] ) ) {
 							$first_param = explode( ' ', $signature_params[0] );
-							$signature .= PHP_EOL . '        return ' . end( $first_param ) . ';';
+							$signature  .= PHP_EOL . '        return ' . end( $first_param ) . ';';
 						}
 						$signature .= PHP_EOL . '    }';
 
@@ -753,7 +867,7 @@ class WpHookExtractor {
 				$hook_for_example = $this->get_hook_name_for_example( $hook );
 				switch ( $this->config['example_style'] ) {
 					case 'prefixed':
-						$callback_name = 'my_' . $hook . '_callback';
+						$callback_name      = 'my_' . $hook . '_callback';
 						$function_signature = "function {$callback_name}(";
 						if ( count( $signature_params ) === 0 ) {
 							$function_signature .= ') {';
@@ -764,7 +878,7 @@ class WpHookExtractor {
 						}
 						$function_signature .= "\n    // Your code here.";
 						if ( 'action' !== $hook_type && ! empty( $signature_params[0] ) ) {
-							$first_param = explode( ' ', $signature_params[0] );
+							$first_param         = explode( ' ', $signature_params[0] );
 							$function_signature .= "\n    return " . end( $first_param ) . ';';
 						}
 						$function_signature .= "\n}";
@@ -786,12 +900,16 @@ class WpHookExtractor {
 
 						// Generate the function documentation.
 						if ( $this->config['autoexample_phpdoc'] ) {
+							$returns_for_docs = $data['returns'] ?? '';
+							if ( is_array( $returns_for_docs ) ) {
+								$returns_for_docs = $returns_for_docs[0][0];
+							}
 							$function_docs = $this->generate_function_docs(
 								$hook,
 								$hook_type,
 								$param_docs,
 								$data['comment'] ?? '',
-								$data['returns'] ?? '',
+								$returns_for_docs,
 								$callback_name
 							);
 
@@ -811,7 +929,7 @@ class WpHookExtractor {
 						$signature .= PHP_EOL . '        // Your code here.';
 						if ( 'action' !== $hook_type && ! empty( $signature_params[0] ) ) {
 							$first_param = explode( ' ', $signature_params[0] );
-							$signature .= PHP_EOL . '        return ' . end( $first_param ) . ';';
+							$signature  .= PHP_EOL . '        return ' . end( $first_param ) . ';';
 						}
 						$signature .= PHP_EOL . '    }';
 
@@ -828,13 +946,14 @@ class WpHookExtractor {
 
 			if ( ! empty( $data['returns'] ) ) {
 				$returns_content = "## Returns\n";
-				$p = preg_split( '/ +/', $data['returns'], 2 );
-				$p[0] = $this->maybe_prefix_namespace( $p[0] );
+				$returns_value   = is_array( $data['returns'] ) ? $data['returns'][0][0] : $data['returns'];
+				$p               = preg_split( '/ +/', $returns_value, 2 );
+				$p[0]            = $this->maybe_prefix_namespace( $p[0] );
 				if ( ! isset( $p[1] ) ) {
 					$p[1] = '';
 				}
-				$returns_content .= "\n`{$p[0]}` {$p[1]}";
-				$returns_content .= PHP_EOL . PHP_EOL;
+				$returns_content    .= "\n`{$p[0]}` {$p[1]}";
+				$returns_content    .= PHP_EOL . PHP_EOL;
 				$sections['returns'] = $returns_content;
 			}
 
@@ -843,7 +962,7 @@ class WpHookExtractor {
 				$files_content .= "- [$file](" . $github_blob_url . str_replace( ':', '#L', $file ) . ")\n";
 				$files_content .= '```php' . PHP_EOL . $signature . PHP_EOL . '```' . PHP_EOL . PHP_EOL;
 			}
-			$files_content .= "\n\n[← All Hooks](Hooks)\n";
+			$files_content    .= "\n\n[← All Hooks](Hooks$link_ext)\n";
 			$sections['files'] = $files_content;
 
 			$hook_docs[ $hook ] = $sections;
@@ -855,9 +974,15 @@ class WpHookExtractor {
 		);
 	}
 
+	/**
+	 * Writes documentation files to disk.
+	 *
+	 * @param array  $documentation Documentation content.
+	 * @param string $docs_path     Path to write documentation.
+	 */
 	public function write_documentation( $documentation, $docs_path ) {
 		if ( ! file_exists( $docs_path ) ) {
-			mkdir( $docs_path, 0777, true );
+			mkdir( $docs_path, 0777, true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_mkdir
 		}
 
 		$section_order = array( 'headline', 'deprecation', 'description', 'example', 'parameters', 'returns', 'files' );
@@ -870,17 +995,22 @@ class WpHookExtractor {
 					$doc .= $sections[ $section_key ];
 				}
 			}
-			file_put_contents( $docs_path . "/$hook.md", $doc );
+			file_put_contents( $docs_path . "/$hook.md", $doc ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		}
 
-		file_put_contents(
+		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			$docs_path . '/Hooks.md',
 			$documentation['index']
 		);
 	}
 
+	/**
+	 * Returns a sample configuration file.
+	 *
+	 * @return string Sample configuration JSON.
+	 */
 	public static function sample_config() {
-		return file_get_contents( __DIR__ . '/../.extract-wp-hooks.json' );
+		return file_get_contents( __DIR__ . '/../.extract-wp-hooks.json' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 	}
 
 	/**
@@ -905,12 +1035,12 @@ class WpHookExtractor {
 		if ( ! empty( $description ) ) {
 			// Format the description for PHPDoc.
 			$description = trim( $description );
-			$lines = explode( "\n", $description );
+			$lines       = explode( "\n", $description );
 			foreach ( $lines as $index => $line ) {
 				$line = trim( $line );
 
 				// Add period to the last line if it doesn't have one.
-				if ( count( $lines ) - 1 === $index && ! empty( $line ) && ! in_array( substr( $line, -1 ), array( '.', '!', '?' ) ) ) {
+				if ( count( $lines ) - 1 === $index && ! empty( $line ) && ! in_array( substr( $line, -1 ), array( '.', '!', '?' ), true ) ) {
 					$line .= '.';
 				}
 
@@ -943,7 +1073,7 @@ class WpHookExtractor {
 				if ( count( $parts ) === 2 ) {
 					// We have both type and variable name.
 					$param_type = $parts[0];
-					$param_var = $parts[1];
+					$param_var  = $parts[1];
 
 					// Extract just the variable name without default value.
 					if ( strpos( $param_var, '=' ) !== false ) {
@@ -961,10 +1091,10 @@ class WpHookExtractor {
 
 					// Pad the type to align variables.
 					$padded_type = str_pad( $param_type, $max_type_length, ' ', STR_PAD_RIGHT );
-					$doc .= " * @param {$padded_type} \${$param_name} {$param_desc}\n";
+					$doc        .= " * @param {$padded_type} \${$param_name} {$param_desc}\n";
 				} else {
 					// Just a variable name without type.
-					$param_var = $parts[0];
+					$param_var  = $parts[0];
 					$param_name = ltrim( $param_var, '$' );
 
 					// Get parameter description if available.
@@ -982,9 +1112,9 @@ class WpHookExtractor {
 		if ( 'filter' === $hook_type ) {
 			if ( ! empty( $return_type ) ) {
 				$return_parts = preg_split( '/ +/', $return_type, 2 );
-				$return_type = $return_parts[0];
-				$return_desc = $return_parts[1] ?? '';
-				$doc .= " * @return {$return_type} {$return_desc}\n";
+				$return_type  = $return_parts[0];
+				$return_desc  = $return_parts[1] ?? '';
+				$doc         .= " * @return {$return_type} {$return_desc}\n";
 			} elseif ( ! empty( $params ) ) {
 				// If we have parameters, assume we return the first parameter's type.
 				$first_param = explode( ' ', $params[0], 2 );
@@ -1012,8 +1142,8 @@ class WpHookExtractor {
 	 */
 	private function extract_deprecation_info( $tokens, $hook_pos ) {
 		$deprecation_info = array();
-		$param_count = 0;
-		$paren_depth = 0;
+		$param_count      = 0;
+		$paren_depth      = 0;
 
 		for ( $k = $hook_pos + 1; $k < $hook_pos + 50; $k++ ) {
 			if ( ! isset( $tokens[ $k ] ) ) {
@@ -1157,7 +1287,10 @@ class WpHookExtractor {
 			'void',
 		);
 
-		if ( $this->config['namespace'] && ! in_array( strtok( $type, '|' ), $builtin_types, true ) && substr( $type, 0, 3 ) !== 'WP_' ) {
+		// Extract base type, stripping union types (|) and generic notation (<).
+		$base_type = strtok( strtok( $type, '|' ), '<' );
+
+		if ( $this->config['namespace'] && ! in_array( $base_type, $builtin_types, true ) && substr( $type, 0, 3 ) !== 'WP_' ) {
 			return $this->config['namespace'] . '\\' . $type;
 		}
 
