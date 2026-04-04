@@ -18,8 +18,11 @@ It generates a markdown file for each filter which is suitable for a Github wiki
 ### Example: Provide Documentation Via a Comment
 For each filter, it looks at the comment preceeding the filter, so that you can document it, for example:
 
+> [!IMPORTANT]
+> You must use a PHPDoc comment (`/**`) — a regular block comment (`/*`) will not be parsed.
+
 ```php
-/*
+/**
  * This is example filter 1.
  *
  * @param string $text The text to modify.
@@ -64,7 +67,7 @@ But not only that, it will contain an auto-generated example:
 You can also provide your own example in the comment, that will override the auto-generated example:
 
 ```php
-/*
+/**
  * This is example filter 2.
  *
  * Example:
