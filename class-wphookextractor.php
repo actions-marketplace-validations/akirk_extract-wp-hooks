@@ -722,7 +722,8 @@ class WpHookExtractor {
 							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $matches[1], '"\'' ) ) );
 						} elseif ( strlen( $var ) - strlen( trim( $var, '"\'' ) ) === 2 ) {
 							$type       = 'string';
-							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $var, '"\'' ) ) );
+							$trimmed    = preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $var, '"\'' ) ) );
+							$vars[ $k ] = '$' . ( '' !== $trimmed ? $trimmed : 'value' );
 						} elseif ( is_numeric( $var ) ) {
 							$type       = 'int';
 							$vars[ $k ] = '$int';

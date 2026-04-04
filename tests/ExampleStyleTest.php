@@ -105,6 +105,32 @@ class ExampleStyleTest extends WpHookExtractor_Testcase {
 		$this->assertStringEqualsFileOrWrite( __DIR__ . '/fixtures/expected/example_prefixed_3_params.md', $documentation['hooks']['multi_param_hook']['example'] );
 	}
 
+	public function test_default_example_style_empty_string_param() {
+		$config = array( 'example_style' => 'default' );
+		$extractor = new WpHookExtractor( $config );
+
+		$file_path = __DIR__ . '/fixtures/empty_string_param.php';
+		$hooks = $extractor->extract_hooks_from_file( $file_path );
+
+		$github_blob_url = 'https://github.com/test/repo/blob/main/';
+		$documentation = $extractor->create_documentation_content( $hooks, $github_blob_url );
+
+		$this->assertStringEqualsFileOrWrite( __DIR__ . '/fixtures/expected/example_default_empty_string_param.md', $documentation['hooks']['ai_assistant_ability_instructions']['example'] );
+	}
+
+	public function test_prefixed_example_style_empty_string_param() {
+		$config = array( 'example_style' => 'prefixed' );
+		$extractor = new WpHookExtractor( $config );
+
+		$file_path = __DIR__ . '/fixtures/empty_string_param.php';
+		$hooks = $extractor->extract_hooks_from_file( $file_path );
+
+		$github_blob_url = 'https://github.com/test/repo/blob/main/';
+		$documentation = $extractor->create_documentation_content( $hooks, $github_blob_url );
+
+		$this->assertStringEqualsFileOrWrite( __DIR__ . '/fixtures/expected/example_prefixed_empty_string_param.md', $documentation['hooks']['ai_assistant_ability_instructions']['example'] );
+	}
+
 	public function test_example_style_does_not_affect_existing_examples() {
 		$config = array( 'example_style' => 'prefixed' );
 		$extractor = new WpHookExtractor( $config );
