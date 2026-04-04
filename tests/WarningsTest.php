@@ -47,6 +47,28 @@ class WarningsTest extends WpHookExtractor_Testcase {
 		$this->assertStringContainsString( '3', $warnings[0] );
 	}
 
+	public function test_warning_for_extra_param_tags() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/extra_params_docblock_hook.php' );
+
+		$warnings = $extractor->get_warnings();
+		$this->assertCount( 1, $warnings );
+		$this->assertStringContainsString( 'extra_params_hook', $warnings[0] );
+		$this->assertStringContainsString( '3', $warnings[0] );
+		$this->assertStringContainsString( '2', $warnings[0] );
+	}
+
+	public function test_warning_for_description_only_docblock_with_params() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/description_only_docblock_hook.php' );
+
+		$warnings = $extractor->get_warnings();
+		$this->assertCount( 1, $warnings );
+		$this->assertStringContainsString( 'description_only_hook', $warnings[0] );
+		$this->assertStringContainsString( '0', $warnings[0] );
+		$this->assertStringContainsString( '2', $warnings[0] );
+	}
+
 	public function test_no_warning_when_param_count_matches() {
 		$extractor = new WpHookExtractor();
 		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/two_params.php' );

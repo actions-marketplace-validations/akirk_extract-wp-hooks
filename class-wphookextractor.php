@@ -185,7 +185,7 @@ class WpHookExtractor {
 				$hooks[ $hook ]     = array_merge( $hooks[ $hook ], $this->parse_docblock( $comment, $hooks[ $hook ]['params'] ) );
 
 				if ( $comment ) {
-					$docblock_param_count = substr_count( $comment, '@param' );
+					$docblock_param_count = preg_match_all( '/^\s*\*\s*@param\b/m', $comment );
 					if ( 0 === $docblock_param_count && empty( $hooks[ $hook ]['comment'] ) ) {
 						$this->warnings[] = sprintf(
 							'%s:%d: Hook %s has an empty /** docblock (no description, no @param tags).',
@@ -193,7 +193,7 @@ class WpHookExtractor {
 							$token[2],
 							$hook
 						);
-					} elseif ( $docblock_param_count > 0 && $docblock_param_count < $actual_param_count ) {
+					} elseif ( $actual_param_count > 0 && $docblock_param_count !== $actual_param_count ) {
 						$this->warnings[] = sprintf(
 							'%s:%d: Hook %s has %d @param tag(s) in its docblock but %d parameter(s).',
 							$file_path,
