@@ -56,4 +56,8 @@ $hooks = $extractor->scan_directory( $base );
 
 $extractor->generate_documentation( $hooks, $base . '/' . $config['wiki_directory'], $config['github_blob_url'] );
 
+foreach ( $extractor->get_warnings() as $warning ) {
+	fwrite( STDERR, 'Warning: ' . $warning . PHP_EOL );
+}
+
 echo 'Generated ' . count( $hooks ) . ' hooks documentation files in ' . realpath( $base . '/' . $config['wiki_directory'] ) . PHP_EOL;
