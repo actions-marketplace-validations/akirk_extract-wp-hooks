@@ -186,7 +186,9 @@ class WpHookExtractor {
 
 				if ( $comment ) {
 					$docblock_param_count = preg_match_all( '/^\s*\*\s*@param\b/m', $comment );
-					if ( 0 === $docblock_param_count && empty( $hooks[ $hook ]['comment'] ) ) {
+					$hook_comment         = $hooks[ $hook ]['comment'] ?? '';
+
+					if ( 0 === $docblock_param_count && empty( $hook_comment ) ) {
 						$this->warnings[] = sprintf(
 							'%s:%d: Hook %s has an empty /** docblock (no description, no @param tags).',
 							$file_path,
@@ -202,6 +204,41 @@ class WpHookExtractor {
 							$docblock_param_count,
 							$actual_param_count
 						);
+					}
+
+					if ( $docblock_param_count > 0 && empty( $hook_comment ) ) {
+						$this->warnings[] = sprintf(
+							'%s:%d: Hook %s has @param tags but no description/title.',
+							$file_path,
+							$token[2],
+							$hook
+						);
+					}
+
+					if ( ! empty( $hook_comment ) ) {
+						$first_newline = strpos( $hook_comment, "\n" );
+						if ( false !== $first_newline && ( "\n" !== ( $hook_comment[ $first_newline + 1 ] ?? '' ) ) ) {
+							$this->warnings[] = sprintf(
+								'%s:%d: Hook %s title is not separated from the description by a blank line.',
+								$file_path,
+								$token[2],
+								$hook
+							);
+						}
+					}
+
+					if ( ! empty( $hooks[ $hook ]['examples'] ) ) {
+						foreach ( $hooks[ $hook ]['examples'] as $example ) {
+							if ( substr_count( $example['content'], '```' ) < 2 ) {
+								$this->warnings[] = sprintf(
+									'%s:%d: Hook %s has a malformed example (missing opening or closing ```php code fence).',
+									$file_path,
+									$token[2],
+									$hook
+								);
+								break;
+							}
+						}
 					}
 				}
 			}

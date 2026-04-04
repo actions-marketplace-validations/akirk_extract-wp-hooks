@@ -76,6 +76,50 @@ class WarningsTest extends WpHookExtractor_Testcase {
 		$this->assertEmpty( $extractor->get_warnings() );
 	}
 
+	public function test_warning_for_no_title() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/no_title_docblock_hook.php' );
+
+		$warnings = $extractor->get_warnings();
+		$this->assertCount( 1, $warnings );
+		$this->assertStringContainsString( 'no_title_hook', $warnings[0] );
+		$this->assertStringContainsString( 'description', $warnings[0] );
+	}
+
+	public function test_warning_for_multiline_title() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/multiline_title_hook.php' );
+
+		$warnings = $extractor->get_warnings();
+		$this->assertCount( 1, $warnings );
+		$this->assertStringContainsString( 'multiline_title_hook', $warnings[0] );
+		$this->assertStringContainsString( 'blank line', $warnings[0] );
+	}
+
+	public function test_no_warning_for_proper_title_and_description() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/docblock_with_example.php' );
+
+		$this->assertEmpty( $extractor->get_warnings() );
+	}
+
+	public function test_warning_for_malformed_example() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/malformed_example_hook.php' );
+
+		$warnings = $extractor->get_warnings();
+		$this->assertCount( 1, $warnings );
+		$this->assertStringContainsString( 'malformed_example_hook', $warnings[0] );
+		$this->assertStringContainsString( 'malformed', $warnings[0] );
+	}
+
+	public function test_no_warning_for_well_formed_example() {
+		$extractor = new WpHookExtractor();
+		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/docblock_with_example.php' );
+
+		$this->assertEmpty( $extractor->get_warnings() );
+	}
+
 	public function test_warnings_cleared_between_files() {
 		$extractor = new WpHookExtractor();
 		$extractor->extract_hooks_from_file( __DIR__ . '/fixtures/block_comment_hook.php' );
