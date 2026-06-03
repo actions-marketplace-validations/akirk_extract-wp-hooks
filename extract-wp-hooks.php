@@ -54,10 +54,15 @@ echo 'Scanning ', $base, PHP_EOL;
 $extractor = new WpHookExtractor( $config );
 $hooks = $extractor->scan_directory( $base );
 
-$extractor->generate_documentation( $hooks, $base . '/' . $config['wiki_directory'], $config['github_blob_url'] );
+$wiki_directory = $config['wiki_directory'];
+if ( '/' !== substr( $wiki_directory, 0, 1 ) ) {
+	$wiki_directory = getcwd() . '/' . $wiki_directory;
+}
+
+$extractor->generate_documentation( $hooks, $wiki_directory, $config['github_blob_url'] );
 
 foreach ( $extractor->get_warnings() as $warning ) {
 	fwrite( STDERR, 'Warning: ' . $warning . PHP_EOL ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 }
 
-echo 'Generated ' . count( $hooks ) . ' hooks documentation files in ' . realpath( $base . '/' . $config['wiki_directory'] ) . PHP_EOL;
+echo 'Generated ' . count( $hooks ) . ' hooks documentation files in ' . realpath( $wiki_directory ) . PHP_EOL;
