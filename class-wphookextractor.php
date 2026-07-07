@@ -18,6 +18,13 @@ class WpHookExtractor {
 	private $config;
 
 	/**
+	 * Warnings collected during extraction.
+	 *
+	 * @var array
+	 */
+	private $warnings = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array $config Configuration options.
@@ -63,6 +70,7 @@ class WpHookExtractor {
 			$hook                    = false;
 			$l                       = max( 0, $i - 50 );
 			$found_significant_token = false;
+			$block_comment_line      = false;
 			for ( $j = $i; $j > $l; $j-- ) {
 				if ( ! is_array( $tokens[ $j ] ) ) {
 					continue;
@@ -78,6 +86,13 @@ class WpHookExtractor {
 					// Only use the comment if we haven't found any significant tokens between it and the hook.
 					if ( ! $found_significant_token ) {
 						$comment = $tokens[ $j ][1];
+					}
+					break;
+				}
+
+				if ( T_COMMENT === $tokens[ $j ][0] && str_starts_with( $tokens[ $j ][1], '/*' ) ) {
+					if ( ! $found_significant_token ) {
+						$block_comment_line = $tokens[ $j ][2];
 					}
 					break;
 				}
@@ -111,6 +126,15 @@ class WpHookExtractor {
 
 					break;
 				}
+			}
+
+			if ( $hook && $block_comment_line && ! $comment ) {
+				$this->warnings[] = sprintf(
+					'%s:%d: Hook %s has a /* block comment instead of a /** PHPDoc comment and will not be documented.',
+					$file_path,
+					$block_comment_line,
+					$hook
+				);
 			}
 
 			if (
@@ -157,7 +181,66 @@ class WpHookExtractor {
 					}
 				}
 
-				$hooks[ $hook ] = array_merge( $hooks[ $hook ], $this->parse_docblock( $comment, $hooks[ $hook ]['params'] ) );
+				$actual_param_count = count( $hooks[ $hook ]['params'] );
+				$hooks[ $hook ]     = array_merge( $hooks[ $hook ], $this->parse_docblock( $comment, $hooks[ $hook ]['params'] ) );
+
+				if ( $comment ) {
+					$docblock_param_count = preg_match_all( '/^\s*\*\s*@param\b/m', $comment );
+					$hook_comment         = $hooks[ $hook ]['comment'] ?? '';
+
+					if ( 0 === $docblock_param_count && empty( $hook_comment ) ) {
+						$this->warnings[] = sprintf(
+							'%s:%d: Hook %s has an empty /** docblock (no description, no @param tags).',
+							$file_path,
+							$token[2],
+							$hook
+						);
+					} elseif ( $actual_param_count > 0 && $docblock_param_count !== $actual_param_count ) {
+						$this->warnings[] = sprintf(
+							'%s:%d: Hook %s has %d @param tag(s) in its docblock but %d parameter(s).',
+							$file_path,
+							$token[2],
+							$hook,
+							$docblock_param_count,
+							$actual_param_count
+						);
+					}
+
+					if ( $docblock_param_count > 0 && empty( $hook_comment ) ) {
+						$this->warnings[] = sprintf(
+							'%s:%d: Hook %s has @param tags but no description/title.',
+							$file_path,
+							$token[2],
+							$hook
+						);
+					}
+
+					if ( ! empty( $hook_comment ) ) {
+						$first_newline = strpos( $hook_comment, "\n" );
+						if ( false !== $first_newline && ( "\n" !== ( $hook_comment[ $first_newline + 1 ] ?? '' ) ) ) {
+							$this->warnings[] = sprintf(
+								'%s:%d: Hook %s title is not separated from the description by a blank line.',
+								$file_path,
+								$token[2],
+								$hook
+							);
+						}
+					}
+
+					if ( ! empty( $hooks[ $hook ]['examples'] ) ) {
+						foreach ( $hooks[ $hook ]['examples'] as $example ) {
+							if ( substr_count( $example['content'], '```' ) < 2 ) {
+								$this->warnings[] = sprintf(
+									'%s:%d: Hook %s has a malformed example (missing opening or closing ```php code fence).',
+									$file_path,
+									$token[2],
+									$hook
+								);
+								break;
+							}
+						}
+					}
+				}
 			}
 		}
 
@@ -499,6 +582,15 @@ class WpHookExtractor {
 	}
 
 	/**
+	 * Returns warnings collected during extraction.
+	 *
+	 * @return array List of warning strings.
+	 */
+	public function get_warnings() {
+		return $this->warnings;
+	}
+
+	/**
 	 * Scans a directory recursively for PHP files and extracts hooks.
 	 *
 	 * @param string $base_path Base directory path to scan.
@@ -722,7 +814,8 @@ class WpHookExtractor {
 							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $matches[1], '"\'' ) ) );
 						} elseif ( strlen( $var ) - strlen( trim( $var, '"\'' ) ) === 2 ) {
 							$type       = 'string';
-							$vars[ $k ] = '$' . preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $var, '"\'' ) ) );
+							$trimmed    = preg_replace( '/[^a-z0-9]/', '_', strtolower( trim( $var, '"\'' ) ) );
+							$vars[ $k ] = '$' . ( '' !== $trimmed ? $trimmed : 'value' );
 						} elseif ( is_numeric( $var ) ) {
 							$type       = 'int';
 							$vars[ $k ] = '$int';
